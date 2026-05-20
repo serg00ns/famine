@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int static  check_if_elf(Elf64_Ehdr *elf)
+static int  check_if_elf(Elf64_Ehdr *elf)
 {
     if (elf->e_ident[EI_MAG0] != ELFMAG0 ||
         elf->e_ident[EI_MAG1] != ELFMAG1 ||
@@ -16,7 +16,7 @@ int static  check_if_elf(Elf64_Ehdr *elf)
     return 1;
 }
 
-int static  find_note_section(Elf64_Shdr *shdr, size_t shnum, Elf64_Shdr **note_shdr)
+static int  find_note_section(Elf64_Shdr *shdr, size_t shnum, Elf64_Shdr **note_shdr)
 {
     for (size_t i = 0; i < shnum; i++)
     {
@@ -34,17 +34,24 @@ int     is_signed(char *adress, size_t lenght)
 {
     size_t lenght_of_string = strlen(SIGNATURE);
     Elf64_Ehdr *elfh = (Elf64_Ehdr *)adress;
-    Elf64_Shdr *shdr = (Elf64_Shdr *)(adress + elfh->e_shoff);
+    Elf64_Shdr *shdr;
     Elf64_Shdr *note_shdr = NULL;
     Elf64_Off note_offset = 0;
 
-    if (lenght == 0)
+    if (lenght < sizeof(Elf64_Ehdr))
         return 0;
     if (check_if_elf(elfh) == 0)
         return 0;
+    if (elfh->e_shoff > lenght || elfh->e_shentsize != sizeof(Elf64_Shdr))
+        return 0;
+    if (elfh->e_shnum > (lenght - elfh->e_shoff) / sizeof(Elf64_Shdr))
+        return 0;
+    shdr = (Elf64_Shdr *)(adress + elfh->e_shoff);
     if (find_note_section(shdr, elfh->e_shnum, &note_shdr) == 0)
         return 0;
     note_offset = note_shdr->sh_offset;
+    if (note_offset > lenght || lenght_of_string > lenght - note_offset)
+        return 0;
     if (strncmp(adress + note_offset, SIGNATURE, lenght_of_string) != 0)
         return 0;
         
@@ -55,7 +62,7 @@ int sign_file(char *adress, size_t lenght)
 {
     size_t lenght_of_string = strlen(SIGNATURE);
 
-    if (lenght == 0)
+    if (lenght < sizeof(Elf64_Ehdr) || lenght < lenght_of_string)
         return 0;
     if (check_if_elf((Elf64_Ehdr *)adress) == 0)
         return 0;
@@ -65,10 +72,8 @@ int sign_file(char *adress, size_t lenght)
     return 1;
 }
 
-int main()
+int main(void)
 {
-    
-
-
+    scan_targets();
     return 0;
 }
