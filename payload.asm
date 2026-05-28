@@ -1,0 +1,3 @@
+BITS 64
+mov rax, 0xDEADBEEFDEADBEEF
+jmp rax

