@@ -29,20 +29,23 @@ Elf64_Phdr *last_phdr(char *data)
 
 uint64_t payload(char *data, size_t data_size, char *code, size_t code_size)
 {
-    
     Elf64_Phdr *target = last_phdr(data);
-    Elf64_Addr new_entry = target->p_vaddr + target->p_filesz;
-
-    target->p_flags |= PF_X;
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)data;
-
-    uint64_t or = target->p_filesz;
-    target->p_filesz += code_size;
-    target->p_memsz  += code_size;
+    
+    uint64_t orig_filesz = target->p_filesz;
+    uint64_t gap = data_size - (target->p_offset + orig_filesz);
+    
+    Elf64_Addr new_entry = target->p_vaddr + orig_filesz + gap;
+    
+    target->p_filesz += gap + code_size;
+    target->p_memsz  += gap + code_size;
+    target->p_flags  |= PF_X;
+    
     uint64_t old_entry = ehdr->e_entry;
     ehdr->e_entry = new_entry;
-    memmove(data + target->p_offset + or, code, code_size);
-
+    
+    memmove(data + data_size, code, code_size);
+    
     return old_entry;
 }
 
