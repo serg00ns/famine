@@ -2,8 +2,7 @@ BITS 64
 
 call next
 next:
-    pop rax
-mov rbx, 0xDEADBEEFDEADBEEF
-    add rax, rbx
-    jmp rax    
-    db "FAMPKNT1"
+	pop rax
+	add rax, 0xDEADBEEF
+	jmp rax
+	db "mbatty|pboucher"

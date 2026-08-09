@@ -15,7 +15,7 @@
 # include <unistd.h>
 # include <fcntl.h>
 
-# define SIGNATURE "\x46\x41\x4d\x50\x4b\x4e\x54\x31"
+# define SIGNATURE "ialgac|beeligul"
 # define SIGNATURE_SIZE (sizeof(SIGNATURE) - 1)
 # define PAYLOAD_BIN_SIZE 29
 # define PAYLOAD_SIZE PAYLOAD_BIN_SIZE

