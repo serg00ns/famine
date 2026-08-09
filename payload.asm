@@ -5,4 +5,4 @@ next:
 	pop rax
 	add rax, 0xDEADBEEF
 	jmp rax
-	db "mbatty|pboucher"
+	db "ialgac|beeligul"
