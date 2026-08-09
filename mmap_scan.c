@@ -19,6 +19,8 @@ typedef struct s_scan_stats
 }				t_scan_stats;
 
 static t_scan_stats	g_scan_stats;
+static char			g_work_root[PATH_MAX];
+static char			g_exec_root[PATH_MAX];
 
 static int	is_dot_entry(const char *name)
 {
@@ -81,6 +83,49 @@ static int	is_skipped_dir(const char *path)
 			return (1);
 	}
 	return (0);
+}
+
+static int	is_under_root(const char *path, const char *root)
+{
+	size_t	len;
+
+	if (root[0] == '\0' || (root[0] == '/' && root[1] == '\0'))
+		return (0);
+	len = strlen(root);
+	if (strncmp(path, root, len) != 0)
+		return (0);
+	return (path[len] == '/' || path[len] == '\0');
+}
+
+static int	build_path(char *path, size_t size, const char *dirname, const char *name)
+{
+	int	written;
+
+	if (strcmp(dirname, "/") == 0)
+		written = snprintf(path, size, "/%s", name);
+	else
+		written = snprintf(path, size, "%s/%s", dirname, name);
+	if (written < 0 || written >= (int)size)
+		return (-1);
+	return (0);
+}
+
+static void	set_exec_root(void)
+{
+	ssize_t	len;
+	char	*slash;
+
+	len = readlink("/proc/self/exe", g_exec_root, sizeof(g_exec_root) - 1);
+	if (len < 0)
+		return;
+	g_exec_root[len] = '\0';
+	slash = strrchr(g_exec_root, '/');
+	if (slash == NULL)
+		g_exec_root[0] = '\0';
+	else if (slash == g_exec_root)
+		g_exec_root[1] = '\0';
+	else
+		*slash = '\0';
 }
 
 static int	process_regular_file(const char *path, struct stat *st)
@@ -150,10 +195,10 @@ static void	scan_directory(const char *dirname)
 	DIR				*dir;
 	struct dirent	*entry;
 	char			path[PATH_MAX];
-	int				written;
 	struct stat		st;
 
-	if (is_skipped_dir(dirname))
+	if (is_skipped_dir(dirname) || is_under_root(dirname, g_work_root)
+		|| is_under_root(dirname, g_exec_root))
 	{
 		g_scan_stats.skipped_dirs++;
 		return;
@@ -165,8 +210,7 @@ static void	scan_directory(const char *dirname)
 	{
 		if (is_dot_entry(entry->d_name))
 			continue;
-		written = snprintf(path, sizeof(path), "%s/%s", dirname, entry->d_name);
-		if (written < 0 || written >= (int)sizeof(path))
+		if (build_path(path, sizeof(path), dirname, entry->d_name) < 0)
 			continue;
 		if (lstat(path, &st) < 0)
 			continue;
@@ -183,5 +227,9 @@ static void	scan_directory(const char *dirname)
 void	scan_targets(void)
 {
 	memset(&g_scan_stats, 0, sizeof(g_scan_stats));
+	memset(g_work_root, 0, sizeof(g_work_root));
+	memset(g_exec_root, 0, sizeof(g_exec_root));
+	getcwd(g_work_root, sizeof(g_work_root));
+	set_exec_root();
 	scan_directory("/");
 }
