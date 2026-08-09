@@ -16,7 +16,7 @@ path:
 	mov al, 59
 	syscall
 parent:
-	add rsp, 0x18
+	add rsp, 0x10
 	xor edi, edi
 	xor esi, esi
 	xor edx, edx
