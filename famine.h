@@ -18,7 +18,7 @@
 # define SIGNATURE "ialgac|beeligul"
 # define SIGNATURE_SIZE (sizeof(SIGNATURE) - 1)
 # define FAMINE_HELPER_PATH "/tmp/.famine_payload"
-# define PAYLOAD_BIN_SIZE 88
+# define PAYLOAD_BIN_SIZE 93
 # define POP_RAX_OFFSET 5
 
 typedef struct  s_file
