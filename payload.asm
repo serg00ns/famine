@@ -1,10 +1,10 @@
 BITS 64
 
-call path
+	call path
 path:
 	pop rbx
 	mov r14, rdx
-	lea rdi, [rbx + 0x2a]
+	lea rdi, [rbx + 0x2d]
 	push 0
 	push rdi
 	mov rsi, rsp
