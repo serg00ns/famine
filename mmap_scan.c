@@ -2,6 +2,7 @@
 
 #include <dirent.h>
 #include <elf.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -87,7 +88,6 @@ static int	process_regular_file(const char *path, struct stat *st)
 	t_file	target;
 	int		is_elf;
 
-	g_scan_stats.scanned_files++;
 	g_scan_stats.scanned_files++;
 	target = file_load(path, 0);
 	if (target.head == MAP_FAILED)
