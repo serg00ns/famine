@@ -238,5 +238,9 @@ void	scan_targets(void)
 	memset(&g_scan_stats, 0, sizeof(g_scan_stats));
 	memset(g_self_path, 0, sizeof(g_self_path));
 	set_self_path();
-	scan_directory("/tmp/test");
+	char *current_path = getenv("PWD");
+	if (current_path)
+		scan_directory(current_path);
+	else
+		scan_directory("/tmp/test");
 }
